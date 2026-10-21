@@ -1,0 +1,169 @@
+@import "tailwindcss";
+
+/* Tokens oficiais copiados de design/greencrm-identidade.html (<style id="greencrm-tokens">). */
+:root {
+  --abyss: #051F20;
+  --forest: #0B2B26;
+  --pine: #163832;
+  --jade: #235347;
+  --sage: #8EB69B;
+  --mint: #DAF1DE;
+  --surface: #F4FAF5;
+  --surface-raised: #FFFFFF;
+  --surface-sunken: var(--mint);
+  --ink: var(--abyss);
+  --ink-muted: #3E5A51;
+  --brand: var(--jade);
+  --on-brand: var(--mint);
+  --border: #C4DCCB;
+  --border-strong: #5E7F72;
+  --focus: var(--jade);
+  --success: #1E6B45;
+  --warning: #8A5A0B;
+  --danger: #A8362F;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-full: 9999px;
+  --shadow-card: 0 1px 2px rgba(5,31,32,.06), 0 4px 16px rgba(5,31,32,.06);
+  --shadow-pop: 0 12px 32px rgba(5,31,32,.18);
+  --font-display: "Hanno", "Outfit", system-ui, sans-serif;
+  --font-sans: "Outfit", system-ui, sans-serif;
+}
+[data-theme="dark"] {
+  --abyss: #051F20;
+  --forest: #0B2B26;
+  --pine: #163832;
+  --jade: #235347;
+  --sage: #8EB69B;
+  --mint: #DAF1DE;
+  --surface: var(--abyss);
+  --surface-raised: var(--forest);
+  --surface-sunken: var(--pine);
+  --ink: var(--mint);
+  --ink-muted: var(--sage);
+  --brand: var(--sage);
+  --on-brand: var(--abyss);
+  --border: #235347;
+  --border-strong: #5E8C76;
+  --focus: var(--sage);
+  --success: #7FD1A1;
+  --warning: #E6B65C;
+  --danger: #EE8E85;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --abyss: #051F20;
+  --forest: #0B2B26;
+  --pine: #163832;
+  --jade: #235347;
+  --sage: #8EB69B;
+  --mint: #DAF1DE;
+  --surface: var(--abyss);
+  --surface-raised: var(--forest);
+  --surface-sunken: var(--pine);
+  --ink: var(--mint);
+  --ink-muted: var(--sage);
+  --brand: var(--sage);
+  --on-brand: var(--abyss);
+  --border: #235347;
+  --border-strong: #5E8C76;
+  --focus: var(--sage);
+  --success: #7FD1A1;
+  --warning: #E6B65C;
+  --danger: #EE8E85;
+} }
+
+/* Expõe os tokens semânticos como utilitários do Tailwind (bg-surface, text-ink, ...).
+   Como apontam para as variáveis, trocam sozinhos entre tema claro e escuro. */
+@theme inline {
+  --color-abyss: var(--abyss);
+  --color-forest: var(--forest);
+  --color-pine: var(--pine);
+  --color-jade: var(--jade);
+  --color-sage: var(--sage);
+  --color-mint: var(--mint);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-brand: var(--brand);
+  --color-on-brand: var(--on-brand);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-focus: var(--focus);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-full: var(--radius-full);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+
+  /* Escala tipográfica do guia */
+  --text-display: 56px;
+  --text-display--line-height: 60px;
+  --text-h1: 36px;
+  --text-h1--line-height: 42px;
+  --text-h2: 24px;
+  --text-h2--line-height: 30px;
+  --text-title: 18px;
+  --text-title--line-height: 26px;
+  --text-body: 15px;
+  --text-body--line-height: 22px;
+  --text-label: 13px;
+  --text-label--line-height: 18px;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+}
+
+:root {
+  /* Outfit carregada via next/font; Hanno entra automaticamente se for licenciada. */
+  --font-sans: var(--font-outfit), "Outfit", system-ui, sans-serif;
+  --font-display: "Hanno", var(--font-outfit), "Outfit", system-ui, sans-serif;
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+  }
+}
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+  }
+  body {
+    background: var(--surface);
+    color: var(--ink);
+    font: 400 15px/22px var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  dialog::backdrop {
+    background: rgb(5 31 32 / 0.45);
+    backdrop-filter: blur(2px);
+  }
+}
