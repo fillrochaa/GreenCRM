@@ -1,19 +1,18 @@
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
+import { bigint, check, date, index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 const timestamps = {
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
-    .$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-    .notNull()
-    .$defaultFn(() => new Date())
+    .defaultNow()
     .$onUpdate(() => new Date()),
 };
 
-export const contacts = sqliteTable(
+export const contacts = pgTable(
   "contacts",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
     name: text("name").notNull(),
     company: text("company"),
     email: text("email"),
@@ -28,18 +27,22 @@ export const contacts = sqliteTable(
 export const stageKinds = ["open", "won", "lost"] as const;
 export type StageKind = (typeof stageKinds)[number];
 
-export const stages = sqliteTable("stages", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  description: text("description"),
-  position: integer("position").notNull(),
-  kind: text("kind", { enum: stageKinds }).notNull().default("open"),
-});
+export const stages = pgTable(
+  "stages",
+  {
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+    name: text("name").notNull(),
+    description: text("description"),
+    position: integer("position").notNull(),
+    kind: text("kind", { enum: stageKinds }).notNull().default("open"),
+  },
+  (t) => [check("stages_kind_check", sql`${t.kind} in ('open', 'won', 'lost')`)],
+);
 
-export const deals = sqliteTable(
+export const deals = pgTable(
   "deals",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
     title: text("title").notNull(),
     contactId: integer("contact_id")
       .notNull()
@@ -49,17 +52,16 @@ export const deals = sqliteTable(
       .references(() => stages.id, { onDelete: "restrict" }),
     position: integer("position").notNull().default(0),
     /** Valor em centavos, para evitar erros de arredondamento. */
-    valueCents: integer("value_cents"),
-    expectedCloseDate: text("expected_close_date"), // AAAA-MM-DD
+    valueCents: bigint("value_cents", { mode: "number" }),
+    expectedCloseDate: date("expected_close_date", { mode: "string" }), // AAAA-MM-DD
     notes: text("notes"),
-    stageChangedAt: integer("stage_changed_at", { mode: "timestamp_ms" })
-      .notNull()
-      .$defaultFn(() => new Date()),
+    stageChangedAt: timestamp("stage_changed_at", { withTimezone: true }).notNull().defaultNow(),
     ...timestamps,
   },
   (t) => [
     index("deals_stage_idx").on(t.stageId, t.position),
     index("deals_contact_idx").on(t.contactId),
+    check("deals_value_cents_check", sql`${t.valueCents} >= 0`),
   ],
 );
 
