@@ -1,9 +1,10 @@
 "use server";
 
-import { and, eq, inArray, min } from "drizzle-orm";
+import { eq, min, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { contacts, db, deals, stages } from "@/db";
+import { requireUser } from "@/lib/auth";
 import { emptyToNull, fail, invalid, ok, type ActionResult } from "@/lib/action-result";
 
 const dealSchema = z.object({
@@ -25,64 +26,66 @@ function revalidate() {
   revalidatePath("/contatos");
 }
 
-function checkReferences(contactId: number, stageId: number): string | null {
-  if (!db.select({ id: contacts.id }).from(contacts).where(eq(contacts.id, contactId)).get()) {
-    return "Contato não encontrado.";
-  }
-  if (!db.select({ id: stages.id }).from(stages).where(eq(stages.id, stageId)).get()) {
-    return "Etapa não encontrada.";
-  }
+async function checkReferences(contactId: number, stageId: number): Promise<string | null> {
+  const [[contact], [stage]] = await Promise.all([
+    db.select({ id: contacts.id }).from(contacts).where(eq(contacts.id, contactId)).limit(1),
+    db.select({ id: stages.id }).from(stages).where(eq(stages.id, stageId)).limit(1),
+  ]);
+  if (!contact) return "Contato não encontrado.";
+  if (!stage) return "Etapa não encontrada.";
   return null;
 }
 
 /** Posição para entrar no topo da coluna. */
-function topPosition(stageId: number) {
-  const row = db.select({ value: min(deals.position) }).from(deals).where(eq(deals.stageId, stageId)).get();
+async function topPosition(stageId: number) {
+  const [row] = await db.select({ value: min(deals.position) }).from(deals).where(eq(deals.stageId, stageId));
   return row?.value == null ? 0 : row.value - 1;
 }
 
 export async function createDeal(input: DealInput): Promise<ActionResult<{ id: number }>> {
+  await requireUser();
   const parsed = dealSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
   const data = parsed.data;
 
-  const refError = checkReferences(data.contactId, data.stageId);
+  const refError = await checkReferences(data.contactId, data.stageId);
   if (refError) return fail(refError);
 
-  const [deal] = db
+  const [deal] = await db
     .insert(deals)
-    .values({ ...data, notes: emptyToNull(data.notes), position: topPosition(data.stageId) })
-    .returning({ id: deals.id })
-    .all();
+    .values({ ...data, notes: emptyToNull(data.notes), position: await topPosition(data.stageId) })
+    .returning({ id: deals.id });
   revalidate();
   return ok(deal);
 }
 
 export async function updateDeal(id: number, input: DealInput): Promise<ActionResult> {
+  await requireUser();
   const parsed = dealSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
   const data = parsed.data;
 
-  const current = db.select().from(deals).where(eq(deals.id, id)).get();
+  const [current] = await db.select({ stageId: deals.stageId }).from(deals).where(eq(deals.id, id)).limit(1);
   if (!current) return fail("Negócio não encontrado.");
-  const refError = checkReferences(data.contactId, data.stageId);
+  const refError = await checkReferences(data.contactId, data.stageId);
   if (refError) return fail(refError);
 
   const stageChanged = current.stageId !== data.stageId;
-  db.update(deals)
+  await db
+    .update(deals)
     .set({
       ...data,
       notes: emptyToNull(data.notes),
-      ...(stageChanged && { stageChangedAt: new Date(), position: topPosition(data.stageId) }),
+      ...(stageChanged && { stageChangedAt: new Date(), position: await topPosition(data.stageId) }),
     })
-    .where(eq(deals.id, id))
-    .run();
+    .where(eq(deals.id, id));
   revalidate();
   return ok(null);
 }
 
 export async function deleteDeal(id: number): Promise<ActionResult> {
-  db.delete(deals).where(eq(deals.id, id)).run();
+  await requireUser();
+  await db.delete(deals).where(eq(deals.id, id));
   revalidate();
   return ok(null);
 }
@@ -96,36 +99,34 @@ const moveSchema = z.object({
 
 /** Chamado pelo arrastar-e-soltar do Kanban. */
 export async function moveDeal(input: z.input<typeof moveSchema>): Promise<ActionResult> {
+  await requireUser();
   const parsed = moveSchema.safeParse(input);
   if (!parsed.success) return fail("Movimento inválido.");
   const { dealId, stageId, orderedIds } = parsed.data;
   if (!orderedIds.includes(dealId)) return fail("Movimento inválido.");
 
-  const result = db.transaction((tx) => {
-    const deal = tx.select().from(deals).where(eq(deals.id, dealId)).get();
+  const result = await db.transaction(async (tx) => {
+    // Sequencial de propósito: numa transação tudo corre na mesma conexão.
+    const [deal] = await tx.select({ stageId: deals.stageId }).from(deals).where(eq(deals.id, dealId)).limit(1);
     if (!deal) return fail("Negócio não encontrado.");
-    if (!tx.select({ id: stages.id }).from(stages).where(eq(stages.id, stageId)).get()) {
-      return fail("Etapa não encontrada.");
-    }
+    const [stage] = await tx.select({ id: stages.id }).from(stages).where(eq(stages.id, stageId)).limit(1);
+    if (!stage) return fail("Etapa não encontrada.");
 
     if (deal.stageId !== stageId) {
-      tx.update(deals).set({ stageId, stageChangedAt: new Date() }).where(eq(deals.id, dealId)).run();
+      await tx.update(deals).set({ stageId, stageChangedAt: new Date() }).where(eq(deals.id, dealId));
     }
 
-    // Só reordena negócios que de fato estão na coluna de destino.
-    const inStage = new Set(
-      tx
-        .select({ id: deals.id })
-        .from(deals)
-        .where(and(eq(deals.stageId, stageId), inArray(deals.id, orderedIds)))
-        .all()
-        .map((r) => r.id),
+    // Reordena a coluna inteira num só comando (o banco fica longe; evita uma ida por card).
+    // O filtro por etapa garante que só negócios que de fato estão na coluna mudem de posição.
+    const order = sql.join(
+      orderedIds.map((id, index) => sql`(${id}::integer, ${index}::integer)`),
+      sql`, `,
     );
-    orderedIds
-      .filter((id) => inStage.has(id))
-      .forEach((id, index) => {
-        tx.update(deals).set({ position: index }).where(eq(deals.id, id)).run();
-      });
+    await tx.execute(sql`
+      update ${deals} set position = v.position, updated_at = now()
+      from (values ${order}) as v(id, position)
+      where ${deals.id} = v.id and ${deals.stageId} = ${stageId}
+    `);
     return ok(null);
   });
 

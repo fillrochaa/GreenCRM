@@ -1,30 +1,17 @@
 import "server-only";
 
-import fs from "node:fs";
-import path from "node:path";
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+import postgres from "postgres";
+import { drizzle } from "drizzle-orm/postgres-js";
 import * as schema from "./schema";
-import { DEFAULT_STAGES } from "./default-stages";
-
-const DB_PATH = path.join(process.cwd(), "data", "greencrm.db");
 
 function createDb() {
-  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-  const sqlite = new Database(DB_PATH);
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("foreign_keys = ON");
-
-  const db = drizzle(sqlite, { schema });
-  migrate(db, { migrationsFolder: path.join(process.cwd(), "drizzle") });
-
-  if (db.select().from(schema.stages).limit(1).all().length === 0) {
-    db.insert(schema.stages)
-      .values(DEFAULT_STAGES.map((s, i) => ({ ...s, position: i })))
-      .run();
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error("DATABASE_URL não definida. Copie .env.example para .env.local e preencha.");
   }
-  return db;
+  // O pooler do Supabase na porta 6543 (modo transação) não aceita prepared statements.
+  const client = postgres(url, { prepare: false, max: 5 });
+  return drizzle(client, { schema });
 }
 
 // Reaproveita a conexão entre recargas do servidor de desenvolvimento.

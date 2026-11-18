@@ -4,6 +4,7 @@ import { count, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { contacts, db, deals, type Contact } from "@/db";
+import { requireUser } from "@/lib/auth";
 import { emptyToNull, fail, invalid, ok, type ActionResult } from "@/lib/action-result";
 
 const contactSchema = z.object({
@@ -37,32 +38,35 @@ function revalidate() {
 }
 
 export async function createContact(input: ContactInput): Promise<ActionResult<Contact>> {
+  await requireUser();
   const parsed = contactSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
 
-  const [contact] = db.insert(contacts).values(toRow(parsed.data)).returning().all();
+  const [contact] = await db.insert(contacts).values(toRow(parsed.data)).returning();
   revalidate();
   return ok(contact);
 }
 
 export async function updateContact(id: number, input: ContactInput): Promise<ActionResult<Contact>> {
+  await requireUser();
   const parsed = contactSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
 
-  const [contact] = db.update(contacts).set(toRow(parsed.data)).where(eq(contacts.id, id)).returning().all();
+  const [contact] = await db.update(contacts).set(toRow(parsed.data)).where(eq(contacts.id, id)).returning();
   if (!contact) return fail("Contato não encontrado.");
   revalidate();
   return ok(contact);
 }
 
 export async function deleteContact(id: number): Promise<ActionResult> {
-  const [{ total }] = db.select({ total: count() }).from(deals).where(eq(deals.contactId, id)).all();
+  await requireUser();
+  const [{ total }] = await db.select({ total: count() }).from(deals).where(eq(deals.contactId, id));
   if (total > 0) {
     return fail(
       `Este contato tem ${total} ${total === 1 ? "negócio" : "negócios"} no funil. Exclua ou transfira os negócios antes.`,
     );
   }
-  db.delete(contacts).where(eq(contacts.id, id)).run();
+  await db.delete(contacts).where(eq(contacts.id, id));
   revalidate();
   return ok(null);
 }

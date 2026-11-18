@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Outfit } from "next/font/google";
-import { Sidebar } from "@/components/sidebar";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -23,10 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body>
-        <Sidebar />
-        <main className="min-h-dvh pl-[72px]">{children}</main>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
