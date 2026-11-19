@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "greencrm-workers",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scripts/with-dev-vars.mjs", "opennextjs-cloudflare", "preview", "--port", "8787"],
+      "port": 8787
     }
   ]
 }

@@ -1,18 +1,18 @@
 import "server-only";
 
 import { asc, count, eq, sql } from "drizzle-orm";
-import { contacts, db, deals, stages } from "@/db";
+import { contacts, getDb, deals, stages } from "@/db";
 import type { BoardDeal, BoardStage, ContactDeal, ContactOption, ContactRow } from "./types";
 
 export async function getStages(): Promise<BoardStage[]> {
-  return db
+  return getDb()
     .select({ id: stages.id, name: stages.name, description: stages.description, kind: stages.kind })
     .from(stages)
     .orderBy(asc(stages.position));
 }
 
 export async function getBoardDeals(): Promise<BoardDeal[]> {
-  const rows = await db
+  const rows = await getDb()
     .select({
       id: deals.id,
       title: deals.title,
@@ -32,20 +32,20 @@ export async function getBoardDeals(): Promise<BoardDeal[]> {
 }
 
 export async function getContactOptions(): Promise<ContactOption[]> {
-  return db
+  return getDb()
     .select({ id: contacts.id, name: contacts.name, company: contacts.company })
     .from(contacts)
     .orderBy(asc(contacts.name));
 }
 
 export async function getContactRows(): Promise<ContactRow[]> {
-  const dealCounts = db
+  const dealCounts = getDb()
     .select({ contactId: deals.contactId, total: count().as("total") })
     .from(deals)
     .groupBy(deals.contactId)
     .as("deal_counts");
 
-  const rows = await db
+  const rows = await getDb()
     .select({
       id: contacts.id,
       name: contacts.name,
@@ -66,7 +66,7 @@ export async function getContactRows(): Promise<ContactRow[]> {
 
 /** Negócios de cada contato, para exibir no detalhe do contato. */
 export async function getDealsByContact(): Promise<Record<number, ContactDeal[]>> {
-  const rows = await db
+  const rows = await getDb()
     .select({
       id: deals.id,
       title: deals.title,

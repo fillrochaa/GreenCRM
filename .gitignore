@@ -3,6 +3,13 @@ node_modules/
 out/
 *.tsbuildinfo
 next-env.d.ts
+.DS_Store
+
+# Segredos locais: nunca versionar
 .env*
 !.env.example
-.DS_Store
+.dev.vars*
+
+# Cloudflare (OpenNext / Wrangler)
+.open-next/
+.wrangler/

@@ -3,7 +3,7 @@
 import { eq, min, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { contacts, db, deals, stages } from "@/db";
+import { contacts, getDb, deals, stages } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { emptyToNull, fail, invalid, ok, type ActionResult } from "@/lib/action-result";
 
@@ -28,8 +28,8 @@ function revalidate() {
 
 async function checkReferences(contactId: number, stageId: number): Promise<string | null> {
   const [[contact], [stage]] = await Promise.all([
-    db.select({ id: contacts.id }).from(contacts).where(eq(contacts.id, contactId)).limit(1),
-    db.select({ id: stages.id }).from(stages).where(eq(stages.id, stageId)).limit(1),
+    getDb().select({ id: contacts.id }).from(contacts).where(eq(contacts.id, contactId)).limit(1),
+    getDb().select({ id: stages.id }).from(stages).where(eq(stages.id, stageId)).limit(1),
   ]);
   if (!contact) return "Contato não encontrado.";
   if (!stage) return "Etapa não encontrada.";
@@ -38,7 +38,7 @@ async function checkReferences(contactId: number, stageId: number): Promise<stri
 
 /** Posição para entrar no topo da coluna. */
 async function topPosition(stageId: number) {
-  const [row] = await db.select({ value: min(deals.position) }).from(deals).where(eq(deals.stageId, stageId));
+  const [row] = await getDb().select({ value: min(deals.position) }).from(deals).where(eq(deals.stageId, stageId));
   return row?.value == null ? 0 : row.value - 1;
 }
 
@@ -51,7 +51,7 @@ export async function createDeal(input: DealInput): Promise<ActionResult<{ id: n
   const refError = await checkReferences(data.contactId, data.stageId);
   if (refError) return fail(refError);
 
-  const [deal] = await db
+  const [deal] = await getDb()
     .insert(deals)
     .values({ ...data, notes: emptyToNull(data.notes), position: await topPosition(data.stageId) })
     .returning({ id: deals.id });
@@ -65,13 +65,13 @@ export async function updateDeal(id: number, input: DealInput): Promise<ActionRe
   if (!parsed.success) return invalid(parsed.error);
   const data = parsed.data;
 
-  const [current] = await db.select({ stageId: deals.stageId }).from(deals).where(eq(deals.id, id)).limit(1);
+  const [current] = await getDb().select({ stageId: deals.stageId }).from(deals).where(eq(deals.id, id)).limit(1);
   if (!current) return fail("Negócio não encontrado.");
   const refError = await checkReferences(data.contactId, data.stageId);
   if (refError) return fail(refError);
 
   const stageChanged = current.stageId !== data.stageId;
-  await db
+  await getDb()
     .update(deals)
     .set({
       ...data,
@@ -85,7 +85,7 @@ export async function updateDeal(id: number, input: DealInput): Promise<ActionRe
 
 export async function deleteDeal(id: number): Promise<ActionResult> {
   await requireUser();
-  await db.delete(deals).where(eq(deals.id, id));
+  await getDb().delete(deals).where(eq(deals.id, id));
   revalidate();
   return ok(null);
 }
@@ -105,7 +105,7 @@ export async function moveDeal(input: z.input<typeof moveSchema>): Promise<Actio
   const { dealId, stageId, orderedIds } = parsed.data;
   if (!orderedIds.includes(dealId)) return fail("Movimento inválido.");
 
-  const result = await db.transaction(async (tx) => {
+  const result = await getDb().transaction(async (tx) => {
     // Sequencial de propósito: numa transação tudo corre na mesma conexão.
     const [deal] = await tx.select({ stageId: deals.stageId }).from(deals).where(eq(deals.id, dealId)).limit(1);
     if (!deal) return fail("Negócio não encontrado.");

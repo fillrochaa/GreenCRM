@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "greencrm",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  // Postgres do Supabase via Hyperdrive (pool de conexões do Cloudflare), com cache desligado:
+  // num CRM, a leitura logo depois de salvar precisa ver o dado novo.
+  // No preview local, a conexão vem de CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE (.dev.vars).
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "75b24a258cab4ca7baed38bf58f8e990"
+    }
+  ],
+  // SUPABASE_URL e SUPABASE_PUBLISHABLE_KEY entram como segredos: `wrangler secret put`.
+  "observability": {
+    "enabled": true
+  }
+}

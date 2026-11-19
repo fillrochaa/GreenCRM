@@ -1,8 +1,8 @@
-import { loadEnvConfig } from "@next/env";
+import { existsSync } from "node:fs";
 import { defineConfig } from "drizzle-kit";
 
-// Lê o .env.local como o Next faz, para o `drizzle-kit studio` achar o DATABASE_URL.
-loadEnvConfig(process.cwd());
+// Segredos locais ficam no .dev.vars (o `drizzle-kit studio` precisa do DATABASE_URL).
+if (existsSync(".dev.vars")) process.loadEnvFile(".dev.vars");
 
 /**
  * As migrações são geradas a partir de src/db/schema.ts direto na pasta do Supabase
